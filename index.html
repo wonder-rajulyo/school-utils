@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학급 출결 관리 시스템</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS (Excel 처리) -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <!-- Tesseract.js (OCR 이미지 텍스트 추출) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @media print {
+            @page { margin: 1cm; size: A4 portrait; }
+            body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .tab-content { display: none !important; }
+            .tab-content.active { display: block !important; padding: 0 !important; }
+            .print-container { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; border: none !important; background-color: transparent !important; }
+            table { border-collapse: collapse !important; width: 100% !important; }
+            th, td { border: 1px solid #000 !important; padding: 8px !important; color: black !important; }
+            
+            #specialFormContainer {
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+            }
+
+            /* 동적 생성 양식 모달 출력용 */
+            body.printing-form #nav-tabs, body.printing-form nav, body.printing-form main, body.printing-form #docPopupWidget, body.printing-form #formModal { display: none !important; }
+            body.printing-form #printArea { display: block !important; }
+        }
+
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .stamp-img { position: absolute; width: 40px; height: 40px; opacity: 0.8; transform: translate(5px, -10px); mix-blend-mode: multiply; }
+        
+        /* 팝업 최소화 효과 */
+        .popup-minimized #docPopupContent { display: none; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-10">
+
+    <!-- 상단 네비게이션바 -->
+    <nav class="bg-indigo-600 text-white shadow-lg no-print sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex flex-wrap justify-between items-center h-16">
+                <div class="flex items-center gap-2 font-bold text-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    스마트 출결 관리
+                </div>
+                <div class="flex space-x-1 overflow-x-auto" id="nav-tabs">
+                    <button data-target="tab-settings" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors bg-indigo-700">설정</button>
+                    <button data-target="tab-attendance" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors">출결 입력</button>
+                    <button data-target="tab-print" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors">보고서 출력</button>
+                    <button data-target="tab-special" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors">특결/공결 양식</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 메인 컨텐츠 컨테이너 -->
+    <main class="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 relative">
+        
+        <!-- 1. 설정 탭 -->
+        <div id="tab-settings" class="tab-content active no-print">
+            <div class="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-slate-200">
+                <h2 class="text-xl font-bold text-slate-800 mb-4 border-b pb-2">학급 및 교사 기본 정보</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-1">학년</label>
+                        <input type="number" id="inpGrade" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="예: 3">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-1">반</label>
+                        <input type="number" id="inpClassNum" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="예: 2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-1">담임교사 성함</label>
+                        <input type="text" id="inpTeacherName" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="예: 홍길동">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-1">교사 도장/서명 (선택)</label>
+                        <input type="file" id="inpStamp" accept="image/*" class="w-full text-sm text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                    </div>
+                </div>
+                
+                <!-- 부가 기능 설정 -->
+                <div class="mt-6 pt-4 border-t flex flex-col md:flex-row justify-between items-center gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer bg-rose-50 px-4 py-2 rounded-lg border border-rose-200 hover:bg-rose-100 transition">
+                        <input type="checkbox" id="inpEnableDocPopup" class="w-5 h-5 text-rose-600 rounded focus:ring-rose-500">
+                        <span class="text-sm font-bold text-rose-800">서류 미제출 알리미 팝업 켜기</span>
+                    </label>
+
+                    <div class="flex items-center gap-4">
+                        <div id="stampPreviewContainer" class="hidden flex items-center gap-2 text-sm text-emerald-600 font-bold bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
+                            <img id="stampPreviewImg" src="" class="h-8 w-8 object-contain">
+                            도장 등록됨
+                            <button onclick="removeStamp()" class="ml-2 text-red-500 hover:text-red-700 text-xs bg-white px-2 py-1 rounded border border-red-200 shadow-sm">삭제</button>
+                        </div>
+                        <button id="btnSaveInfo" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-medium transition shadow-sm">정보 저장</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        학생 명단 관리
+                        <span class="text-sm font-normal text-slate-500">총 <span id="studentCount">0</span>명</span>
+                    </h2>
+                    <div class="flex gap-2">
+                        <label class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm cursor-pointer flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                            사진으로 등록
+                            <input type="file" id="inpPhotoImport" accept="image/*" class="hidden">
+                        </label>
+                        <label class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm cursor-pointer flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                            엑셀 일괄 등록
+                            <input type="file" id="inpExcelImport" accept=".xlsx, .xls, .csv" class="hidden">
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2 mb-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                    <input type="number" id="inpStuNum" class="w-24 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="번호">
+                    <input type="text" id="inpStuName" class="flex-grow px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="이름 (예: 홍길동)" onkeypress="if(event.key === 'Enter') addStudent()">
+                    <button onclick="addStudent()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">추가</button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-sm">
+                                <th class="py-3 px-4 rounded-tl-lg w-20">번호</th>
+                                <th class="py-3 px-4">이름</th>
+                                <th class="py-3 px-4 rounded-tr-lg w-24 text-center">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentListBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 출결 입력 탭 -->
+        <div id="tab-attendance" class="tab-content no-print">
+            <div class="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-slate-200">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4 border-b pb-4 mb-4">
+                    <div class="flex items-center gap-3">
+                        <label class="text-sm font-bold text-slate-700">해당 날짜</label>
+                        <input type="date" id="attendanceDate" class="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium text-lg">
+                    </div>
+                    <div class="flex gap-2 flex-wrap justify-end">
+                        <button onclick="exportToExcel()" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-2 rounded-lg text-sm font-semibold transition border border-blue-200 flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            엑셀 다운로드
+                        </button>
+                        <button onclick="markAllPresent()" class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-4 py-2 rounded-lg text-sm font-semibold transition border border-emerald-200 flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                            전원 출석
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[950px]">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-sm">
+                                <th class="py-3 px-4 rounded-tl-lg w-12 text-center">번호</th>
+                                <th class="py-3 px-4 w-20">이름</th>
+                                <th class="py-3 px-4 w-28 text-center">상태</th>
+                                <th class="py-3 px-4 w-48">사유 (선택/입력)</th>
+                                <th class="py-3 px-4 rounded-tr-lg">증빙 서류 및 제출확인</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceListBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 보고서 출력 탭 -->
+        <div id="tab-print" class="tab-content">
+            <div class="bg-white rounded-2xl shadow-sm p-4 mb-6 border border-slate-200 no-print flex justify-between items-center">
+                <div>
+                    <h2 class="font-bold text-slate-800">일일 출결 보고서 미리보기</h2>
+                    <p class="text-sm text-slate-500">배경 그래픽 인쇄 옵션을 켜주세요.</p>
+                </div>
+                <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold shadow-md transition flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" /></svg>
+                    인쇄하기
+                </button>
+            </div>
+
+            <div class="print-container bg-white shadow-lg border border-slate-200 mx-auto p-10 max-w-[21cm] min-h-[29.7cm] text-black">
+                <div class="flex justify-end mb-8">
+                    <table class="border-collapse text-center text-sm border border-black">
+                        <tr>
+                            <td rowspan="2" class="bg-gray-100 font-bold border border-black w-8 px-1 py-4">결<br>재</td>
+                            <td class="bg-gray-100 border border-black w-24 py-1">담 임</td>
+                        </tr>
+                        <tr>
+                            <td class="border border-black h-20 relative">
+                                <span id="printTeacherName" class="absolute bottom-2 right-2 text-sm"></span>
+                                <img id="printStampImg" src="" class="stamp-img hidden">
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <h1 class="text-3xl font-bold text-center mb-10 tracking-widest">일 일 출 결 상 황 부</h1>
+
+                <div class="flex justify-between items-end mb-4 border-b-2 border-black pb-2 text-lg font-bold">
+                    <div id="printDateDisp"></div>
+                    <div id="printClassDisp"></div>
+                </div>
+
+                <h3 class="font-bold text-lg mb-2">1. 출결 통계</h3>
+                <table class="w-full border-collapse border border-black text-center mb-8">
+                    <tr class="bg-gray-100">
+                        <th class="border border-black py-2">재적</th>
+                        <th class="border border-black py-2">출석</th>
+                        <th class="border border-black py-2">결석</th>
+                        <th class="border border-black py-2">지각</th>
+                        <th class="border border-black py-2">조퇴</th>
+                        <th class="border border-black py-2">결과</th>
+                    </tr>
+                    <tr class="font-bold text-lg">
+                        <td class="border border-black py-3" id="statTotal">0</td>
+                        <td class="border border-black py-3" id="statPresent">0</td>
+                        <td class="border border-black py-3" id="statAbsent">0</td>
+                        <td class="border border-black py-3" id="statLate">0</td>
+                        <td class="border border-black py-3" id="statEarly">0</td>
+                        <td class="border border-black py-3" id="statOther">0</td>
+                    </tr>
+                </table>
+
+                <h3 class="font-bold text-lg mb-2">2. 결석 및 특이상황자 명단</h3>
+                <table class="w-full border-collapse border border-black text-center text-sm">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-black py-2 w-12">번호</th>
+                            <th class="border border-black py-2 w-20">이름</th>
+                            <th class="border border-black py-2 w-20">구분</th>
+                            <th class="border border-black py-2">사유</th>
+                            <th class="border border-black py-2 w-32">증빙 서류</th>
+                        </tr>
+                    </thead>
+                    <tbody id="printExceptionList"></tbody>
+                </table>
+                <p id="printNoExceptionMsg" class="text-center py-4 text-gray-500 border border-t-0 border-black hidden">특이사항 없음 (전원 출석)</p>
+            </div>
+        </div>
+
+        <!-- 4. 특결/공결 양식 탭 -->
+        <div id="tab-special" class="tab-content">
+            <div class="bg-white rounded-2xl shadow-sm p-4 mb-6 border border-slate-200 no-print">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 class="font-bold text-slate-800">자유 편집 양식 (자동 저장됨)</h2>
+                        <p class="text-sm text-slate-500">아래 양식의 텍스트를 클릭해 직접 커스텀 양식을 만드세요. '출결 입력' 탭의 <b class="text-indigo-600">[양식 생성]</b> 버튼을 누르면 완전히 자동으로 양식이 만들어집니다!</p>
+                    </div>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <label class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition border border-slate-300 cursor-pointer flex-grow text-center">
+                            배경 양식 업로드 (JPG, PNG)
+                            <input type="file" id="inpBgImage" accept="image/*" class="hidden">
+                        </label>
+                        <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold shadow-md transition flex items-center gap-2">
+                            인쇄
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <button onclick="resetSpecialForm()" class="text-xs text-red-500 hover:underline">양식 텍스트 초기화</button>
+                    <button onclick="removeBgImage()" class="text-xs text-red-500 hover:underline">배경 이미지 제거</button>
+                </div>
+            </div>
+
+            <div id="specialFormContainer" class="print-container bg-white shadow-lg border border-slate-200 mx-auto p-10 max-w-[21cm] min-h-[29.7cm] text-black">
+                <div id="specialFormContent" oninput="saveSpecialFormHtml()">
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 양식 자동 생성 및 인쇄 모달 -->
+    <div id="formModal" class="fixed inset-0 bg-slate-900 bg-opacity-70 z-[60] hidden flex justify-center items-center p-4 no-print transition-opacity">
+        <div class="bg-slate-200 rounded-xl shadow-2xl w-full max-w-4xl h-full max-h-[95vh] flex flex-col overflow-hidden">
+            <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center shadow-md z-10">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    자동 완성 양식 인쇄
+                </h3>
+                <div class="flex gap-2">
+                    <button onclick="printFormModal()" class="bg-indigo-500 hover:bg-indigo-600 px-6 py-2 rounded-lg font-bold shadow transition flex items-center gap-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        출력하기
+                    </button>
+                    <button onclick="closeFormModal()" class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded-lg font-bold transition text-sm">
+                        닫기
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 flex-grow overflow-y-auto flex justify-center bg-slate-300">
+                <div id="formModalContent" class="bg-white shadow-lg mx-auto p-12 w-[21cm] min-h-[29.7cm] text-black">
+                    <!-- 동적 생성된 양식 렌더링 영역 -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 인쇄 전용 숨김 영역 -->
+    <div id="printArea" class="hidden bg-white text-black p-10 w-[21cm] min-h-[29.7cm]"></div>
+
+    <!-- 플로팅 서류 알리미 팝업 위젯 (모바일 반응형 적용) -->
+    <div id="docPopupWidget" class="fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-6 sm:w-80 bg-white rounded-xl shadow-2xl border border-rose-200 z-50 hidden flex-col transition-all duration-300 no-print">
+        <div class="bg-rose-500 text-white px-4 py-3 rounded-t-xl font-bold flex justify-between items-center shadow-sm">
+            <div class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                서류 알리미 (<span id="docPopupCount">0</span>)
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="togglePopupCompleted()" id="btnToggleCompleted" class="text-xs bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded border border-rose-400 transition">완료보기</button>
+                <button onclick="togglePopupMinimize()" class="hover:text-rose-200 text-xl leading-none">&minus;</button>
+            </div>
+        </div>
+        <div id="docPopupContent" class="max-h-72 overflow-y-auto bg-slate-50 rounded-b-xl divide-y divide-slate-200 text-sm">
+            <!-- 미제출/완료 리스트 렌더링 -->
+        </div>
+    </div>
+
+    <!-- 알림 토스트 -->
+    <div id="toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 translate-y-20 opacity-0 transition-all duration-300 text-white px-6 py-3 rounded-lg shadow-lg font-bold flex items-center gap-2 z-50 pointer-events-none">
+        <span id="toastMsg">알림</span>
+    </div>
+
+    <!-- 기본 제공 사유/서류 리스트 -->
+    <datalist id="reasonOptions">
+        <option value="질병">
+        <option value="인정-생리">
+        <option value="인정-체험학습">
+        <option value="미인정">
+        <option value="기타">
+    </datalist>
+
+    <script>
+        const DEFAULT_SPECIAL_FORM = `
+                <h1 class="text-2xl font-bold text-center mt-20 mb-10 text-slate-400 tracking-wide" contenteditable="true">원하시는 양식을 자유롭게 만들어 보세요.</h1>
+        `;
+
+        let appData = {
+            classInfo: { grade: '', classNum: '', teacherName: '', stampImage: '' },
+            settings: { enableDocPopup: false },
+            students: [],
+            attendanceRecords: {},
+            specialFormHTML: '',
+            specialFormBgImage: ''
+        };
+
+        const STATUS_OPTIONS = {
+            "PRESENT": { label: "출석", color: "bg-emerald-100 text-emerald-800" },
+            "ABSENT": { label: "결석", color: "bg-red-100 text-red-800" },
+            "LATE": { label: "지각", color: "bg-orange-100 text-orange-800" },
+            "EARLY": { label: "조퇴", color: "bg-yellow-100 text-yellow-800" },
+            "OTHER": { label: "결과", color: "bg-blue-100 text-blue-800" }
+        };
+
+        const DOC_OPTIONS = ["(없음)", "결석신고서", "생리결석확인서", "진단서/처방전", "체험학습결과보고서", "기타"];
+
+        let currentDateStr = '';
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadData();
+            initTabs();
+            
+            const today = new Date();
+            const offset = today.getTimezoneOffset() * 60000;
+            currentDateStr = new Date(today - offset).toISOString().split('T')[0];
+            
+            const dateInput = document.getElementById('attendanceDate');
+            dateInput.value = currentDateStr;
+            dateInput.addEventListener('change', (e) => {
+                currentDateStr = e.target.value;
+                renderAttendanceTab();
+            });
+
+            document.getElementById('btnSaveInfo').addEventListener('click', saveClassInfo);
+            document.getElementById('inpStamp').addEventListener('change', handleStampUpload);
+            document.getElementById('inpBgImage').addEventListener('change', handleBgUpload);
+            document.getElementById('inpExcelImport').addEventListener('change', handleExcelImport);
+            document.getElementById('inpPhotoImport').addEventListener('change', handlePhotoImport);
+
+            renderSettingsTab();
+            renderAttendanceTab();
+            initSpecialForm();
+            refreshDocPopup();
+        });
+
+        function loadData() {
+            const saved = localStorage.getItem('attendanceAppDataV3');
+            if (saved) {
+                appData = JSON.parse(saved);
+                if (!appData.settings) appData.settings = { enableDocPopup: false };
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('attendanceAppDataV3', JSON.stringify(appData));
+            refreshDocPopup();
+        }
+
+        function showToast(msg, isSuccess = true) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = msg;
+            toast.className = `fixed bottom-10 left-1/2 transform -translate-x-1/2 transition-all duration-300 text-white px-6 py-3 rounded-lg shadow-lg font-bold flex items-center gap-2 z-50 ${isSuccess ? 'bg-indigo-600' : 'bg-red-500'}`;
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 2000);
+        }
+
+        function initTabs() {
+            const btns = document.querySelectorAll('.tab-btn');
+            btns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    btns.forEach(b => { b.classList.remove('bg-indigo-700'); b.classList.add('hover:bg-indigo-500'); });
+                    btn.classList.add('bg-indigo-700'); btn.classList.remove('hover:bg-indigo-500');
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    const targetId = btn.getAttribute('data-target');
+                    document.getElementById(targetId).classList.add('active');
+                    if (targetId === 'tab-print') renderPrintTab();
+                    else if (targetId === 'tab-attendance') renderAttendanceTab();
+                });
+            });
+        }
+
+        // --- 설정 탭 ---
+        function saveClassInfo() {
+            appData.classInfo.grade = document.getElementById('inpGrade').value;
+            appData.classInfo.classNum = document.getElementById('inpClassNum').value;
+            appData.classInfo.teacherName = document.getElementById('inpTeacherName').value;
+            appData.settings.enableDocPopup = document.getElementById('inpEnableDocPopup').checked;
+            saveData();
+            showToast("정보가 저장되었습니다.");
+        }
+
+        function handleStampUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    appData.classInfo.stampImage = event.target.result;
+                    saveData(); renderSettingsTab(); showToast("도장 저장됨.");
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeStamp() {
+            appData.classInfo.stampImage = ''; document.getElementById('inpStamp').value = '';
+            saveData(); renderSettingsTab();
+        }
+
+        function renderSettingsTab() {
+            document.getElementById('inpGrade').value = appData.classInfo.grade || '';
+            document.getElementById('inpClassNum').value = appData.classInfo.classNum || '';
+            document.getElementById('inpTeacherName').value = appData.classInfo.teacherName || '';
+            document.getElementById('inpEnableDocPopup').checked = appData.settings.enableDocPopup;
+            
+            if (appData.classInfo.stampImage) {
+                document.getElementById('stampPreviewContainer').classList.remove('hidden');
+                document.getElementById('stampPreviewImg').src = appData.classInfo.stampImage;
+            } else {
+                document.getElementById('stampPreviewContainer').classList.add('hidden');
+            }
+
+            appData.students.sort((a, b) => a.number - b.number);
+            document.getElementById('studentCount').textContent = appData.students.length;
+            const tbody = document.getElementById('studentListBody');
+            tbody.innerHTML = '';
+            appData.students.forEach(student => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="py-2 px-4 font-medium">${student.number}</td><td class="py-2 px-4">${student.name}</td><td class="py-2 px-4 text-center"><button onclick="removeStudent('${student.id}')" class="text-red-500 hover:text-red-700 text-sm font-medium px-2 py-1 rounded hover:bg-red-50 transition">삭제</button></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function addStudent() {
+            const num = parseInt(document.getElementById('inpStuNum').value);
+            const name = document.getElementById('inpStuName').value.trim();
+            if (!num || !name) return showToast("입력 오류", false);
+            if (appData.students.some(s => s.number === num)) return showToast("중복 번호", false);
+            appData.students.push({ id: Date.now().toString(), number: num, name: name });
+            document.getElementById('inpStuNum').value = ''; document.getElementById('inpStuName').value = ''; 
+            document.getElementById('inpStuNum').focus();
+            saveData(); renderSettingsTab();
+        }
+
+        function removeStudent(id) {
+            if (confirm("삭제하시겠습니까?")) {
+                appData.students = appData.students.filter(s => s.id !== id);
+                saveData(); renderSettingsTab();
+            }
+        }
+
+        function handleExcelImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                    
+                    let added = 0;
+                    rows.forEach(row => {
+                        // 보통 번호, 이름 순으로 작성됨. 빈칸 건너뛰기 처리
+                        const colA = row[0];
+                        const colB = row[1];
+                        
+                        if (colA !== undefined && colB !== undefined) {
+                            const num = parseInt(colA);
+                            const name = colB.toString().trim();
+                            
+                            // 숫자가 정상이고 이름 헤더가 아닌 경우만 추가
+                            if (!isNaN(num) && name && name !== '이름' && name !== '성명' && name !== '성 명') {
+                                if (!appData.students.some(s => s.number === num)) {
+                                    appData.students.push({ id: Date.now().toString() + Math.random(), number: num, name: name });
+                                    added++;
+                                }
+                            }
+                        }
+                    });
+
+                    if (added > 0) {
+                        saveData();
+                        renderSettingsTab();
+                        showToast(added + "명의 학생 명단이 등록되었습니다.");
+                    } else {
+                        showToast("추가된 명단이 없습니다. (중복 또는 형식 오류)", false);
+                    }
+                } catch(err) {
+                    showToast("엑셀 파일을 읽는 중 오류가 발생했습니다.", false);
+                }
+                document.getElementById('inpExcelImport').value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function handlePhotoImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            showToast("인공지능이 사진 속 명단을 분석 중입니다... (최대 10초 소요)");
+
+            try {
+                // Tesseract OCR 실행 (한국어 인식)
+                const result = await Tesseract.recognize(file, 'kor');
+                const text = result.data.text;
+                
+                const lines = text.split('\n');
+                let added = 0;
+
+                lines.forEach(line => {
+                    // 정규식: "숫자 + (공백/기호) + 한글이름(2~5자)" 패턴 찾기
+                    // 예: "1 홍길동", "01. 김철수", "2.이영희"
+                    const match = line.match(/(\d+)[^\w가-힣]*([가-힣]{2,5})/);
+                    if (match) {
+                        const num = parseInt(match[1], 10);
+                        const name = match[2];
+                        
+                        // 예외 단어 필터링
+                        if (!isNaN(num) && name && name !== '이름' && name !== '성명' && name !== '학년' && name !== '번호') {
+                            if (!appData.students.some(s => s.number === num)) {
+                                appData.students.push({ id: Date.now().toString() + Math.random(), number: num, name: name });
+                                added++;
+                            }
+                        }
+                    }
+                });
+
+                if (added > 0) {
+                    saveData();
+                    renderSettingsTab();
+                    showToast(added + "명의 학생 명단이 사진에서 추출되어 등록되었습니다! 🎉");
+                } else {
+                    showToast("사진에서 번호와 이름을 찾지 못했습니다. 글자가 선명한 사진으로 다시 시도해 주세요.", false);
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("사진 분석 중 오류가 발생했습니다.", false);
+            }
+            
+            document.getElementById('inpPhotoImport').value = '';
+        }
+
+        // --- 출결 탭 ---
+        function getOrCreateRecord(dateStr, studentId) {
+            if (!appData.attendanceRecords[dateStr]) appData.attendanceRecords[dateStr] = {};
+            if (!appData.attendanceRecords[dateStr][studentId]) appData.attendanceRecords[dateStr][studentId] = { status: 'PRESENT', reason: '', doc: '(없음)', docSubmitted: false };
+            return appData.attendanceRecords[dateStr][studentId];
+        }
+
+        function markAllPresent() {
+            if (appData.students.length === 0) return showToast("학생 없음", false);
+            if (!appData.attendanceRecords[currentDateStr]) appData.attendanceRecords[currentDateStr] = {};
+            appData.students.forEach(s => { 
+                const rec = getOrCreateRecord(currentDateStr, s.id);
+                appData.attendanceRecords[currentDateStr][s.id] = { status: 'PRESENT', reason: '', doc: '(없음)', docSubmitted: false };
+            });
+            saveData(); renderAttendanceTab(); showToast("전원 출석 처리됨.");
+        }
+
+        function updateAttendance(studentId, field, value) {
+            const record = getOrCreateRecord(currentDateStr, studentId);
+            record[field] = value;
+            saveData();
+            if (field === 'status' || field === 'reason') renderAttendanceTab();
+        }
+
+        function renderAttendanceTab() {
+            const tbody = document.getElementById('attendanceListBody');
+            tbody.innerHTML = '';
+            if (appData.students.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">학생을 추가해주세요.</td></tr>`; return;
+            }
+
+            appData.students.sort((a, b) => a.number - b.number).forEach(student => {
+                const record = getOrCreateRecord(currentDateStr, student.id);
+                const statusColor = STATUS_OPTIONS[record.status].color;
+
+                let optionsHtml = '';
+                for (const [key, val] of Object.entries(STATUS_OPTIONS)) {
+                    optionsHtml += `<option value="${key}" ${key === record.status ? 'selected' : ''} class="text-black bg-white">${val.label}</option>`;
+                }
+
+                let docOptionsHtml = '';
+                DOC_OPTIONS.forEach(doc => {
+                    docOptionsHtml += `<option value="${doc}" ${doc === record.doc ? 'selected' : ''}>${doc}</option>`;
+                });
+                
+                // 동적 양식 버튼 로직
+                let generateBtnHtml = '';
+                if (record.status !== 'PRESENT' && (record.reason === '질병' || record.reason === '인정-생리' || record.reason === '인정-체험학습')) {
+                    generateBtnHtml = `<button onclick="openFormModal('${student.id}', '${currentDateStr}')" class="ml-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded text-xs font-bold border border-indigo-200 transition shadow-sm whitespace-nowrap">양식생성</button>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-2 px-4 text-center font-medium">${student.number}</td>
+                    <td class="py-2 px-4 font-medium">${student.name}</td>
+                    <td class="py-2 px-4 text-center">
+                        <select onchange="updateAttendance('${student.id}', 'status', this.value)" class="${statusColor} w-full py-1.5 px-2 rounded-lg font-bold border-none outline-none appearance-none cursor-pointer text-center focus:ring-2 focus:ring-indigo-300">${optionsHtml}</select>
+                    </td>
+                    <td class="py-2 px-4">
+                        <input type="text" list="reasonOptions" onchange="updateAttendance('${student.id}', 'reason', this.value)" value="${record.reason}" placeholder="질병/인정-생리/인정-체험학습/미인정" class="w-full px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-slate-50 focus:bg-white transition-colors">
+                    </td>
+                    <td class="py-2 px-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 flex-grow max-w-[200px]">
+                                <select onchange="updateAttendance('${student.id}', 'doc', this.value)" class="w-full py-1.5 px-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-300 outline-none">${docOptionsHtml}</select>
+                                <label class="flex items-center gap-1 text-xs font-bold whitespace-nowrap cursor-pointer text-slate-600 bg-slate-50 px-2 py-1.5 rounded border border-slate-200 hover:bg-slate-100">
+                                    <input type="checkbox" onchange="updateAttendance('${student.id}', 'docSubmitted', this.checked)" ${record.docSubmitted ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded">
+                                    받음
+                                </label>
+                            </div>
+                            ${generateBtnHtml}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- 출력 탭 ---
+        function renderPrintTab() {
+            const dateObj = new Date(currentDateStr);
+            const days = ['일', '월', '화', '수', '목', '금', '토'];
+            document.getElementById('printDateDisp').textContent = `${dateObj.getFullYear()}년 ${String(dateObj.getMonth() + 1).padStart(2, '0')}월 ${String(dateObj.getDate()).padStart(2, '0')}일 (${days[dateObj.getDay()]})`;
+            
+            const g = appData.classInfo.grade || 'O'; const c = appData.classInfo.classNum || 'O'; const t = appData.classInfo.teacherName || '(미입력)';
+            document.getElementById('printClassDisp').textContent = `제 ${g}학년 ${c}반   담임: ${t} (인)`;
+            document.getElementById('printTeacherName').textContent = t;
+            
+            const stampImg = document.getElementById('printStampImg');
+            if (appData.classInfo.stampImage) {
+                stampImg.src = appData.classInfo.stampImage; stampImg.classList.remove('hidden');
+            } else { stampImg.classList.add('hidden'); }
+
+            let stats = { total: appData.students.length, present: 0, absent: 0, late: 0, early: 0, other: 0 };
+            let exceptions = [];
+
+            appData.students.sort((a, b) => a.number - b.number).forEach(student => {
+                const record = getOrCreateRecord(currentDateStr, student.id);
+                if (record.status === 'PRESENT') stats.present++; else if (record.status === 'ABSENT') stats.absent++;
+                else if (record.status === 'LATE') stats.late++; else if (record.status === 'EARLY') stats.early++; else if (record.status === 'OTHER') stats.other++;
+
+                if (record.status !== 'PRESENT' || record.reason.trim() !== '') {
+                    exceptions.push({ number: student.number, name: student.name, statusLabel: STATUS_OPTIONS[record.status].label, reason: record.reason, doc: record.doc, sub: record.docSubmitted });
+                }
+            });
+
+            document.getElementById('statTotal').textContent = stats.total; document.getElementById('statPresent').textContent = stats.present;
+            document.getElementById('statAbsent').textContent = stats.absent; document.getElementById('statLate').textContent = stats.late;
+            document.getElementById('statEarly').textContent = stats.early; document.getElementById('statOther').textContent = stats.other;
+
+            const tbody = document.getElementById('printExceptionList');
+            const noMsg = document.getElementById('printNoExceptionMsg');
+            tbody.innerHTML = '';
+            if (exceptions.length === 0) noMsg.classList.remove('hidden');
+            else {
+                noMsg.classList.add('hidden');
+                exceptions.forEach(ex => {
+                    const docStr = (ex.doc && ex.doc !== '(없음)') ? `${ex.doc} ${ex.sub ? '[제출됨]' : '[미제출]'}` : '';
+                    tbody.innerHTML += `<tr>
+                        <td class="border border-black py-2">${ex.number}</td>
+                        <td class="border border-black py-2 font-medium">${ex.name}</td>
+                        <td class="border border-black py-2">${ex.statusLabel}</td>
+                        <td class="border border-black py-2 text-left px-4">${ex.reason}</td>
+                        <td class="border border-black py-2 text-xs">${docStr}</td>
+                    </tr>`;
+                });
+            }
+        }
+
+        // --- 특결 양식 탭 ---
+        function initSpecialForm() {
+            const content = document.getElementById('specialFormContent');
+            content.innerHTML = appData.specialFormHTML || DEFAULT_SPECIAL_FORM;
+            const container = document.getElementById('specialFormContainer');
+            container.style.backgroundImage = appData.specialFormBgImage ? `url(${appData.specialFormBgImage})` : 'none';
+        }
+        function saveSpecialFormHtml() { appData.specialFormHTML = document.getElementById('specialFormContent').innerHTML; saveData(); }
+        function resetSpecialForm() { if(confirm('초기화하시겠습니까?')) { appData.specialFormHTML = ''; saveData(); initSpecialForm(); } }
+        function handleBgUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => { appData.specialFormBgImage = ev.target.result; saveData(); initSpecialForm(); showToast("배경 이미지 적용됨"); };
+                reader.readAsDataURL(file);
+            }
+        }
+        function removeBgImage() { appData.specialFormBgImage = ''; document.getElementById('inpBgImage').value = ''; saveData(); initSpecialForm(); }
+        
+        function exportToExcel() {
+            if (Object.keys(appData.attendanceRecords).length === 0) return showToast("기록 없음", false);
+            let csvContent = "\uFEFF날짜,번호,이름,출결상태,사유,증빙서류,제출여부\n";
+            const dates = Object.keys(appData.attendanceRecords).sort();
+            dates.forEach(date => {
+                appData.students.sort((a, b) => a.number - b.number).forEach(student => {
+                    const rec = appData.attendanceRecords[date][student.id];
+                    if (rec) {
+                        const r = rec.reason ? rec.reason.replace(/,/g, " ") : "";
+                        const d = (rec.doc && rec.doc !== '(없음)') ? rec.doc.replace(/,/g, " ") : "";
+                        csvContent += `${date},${student.number},${student.name},${STATUS_OPTIONS[rec.status].label},${r},${d},${rec.docSubmitted ? 'Y':'N'}\n`;
+                    }
+                });
+            });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
+            link.download = `출결기록_${new Date().toISOString().split('T')[0]}.csv`;
+            link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        // --- 서류 미제출 팝업 위젯 ---
+        let showCompletedDocs = false;
+
+        function togglePopupMinimize() { document.getElementById('docPopupWidget').classList.toggle('popup-minimized'); }
+        function togglePopupCompleted() {
+            showCompletedDocs = !showCompletedDocs;
+            document.getElementById('btnToggleCompleted').textContent = showCompletedDocs ? '미제출보기' : '완료보기';
+            refreshDocPopup();
+        }
+
+        function forceDocSubmitted(dateStr, studentId) {
+            const record = appData.attendanceRecords[dateStr][studentId];
+            if(record) {
+                record.docSubmitted = true; saveData();
+                if (currentDateStr === dateStr) renderAttendanceTab();
+                showToast("서류 제출이 확인되었습니다.");
+            }
+        }
+
+        function forceDocUnsubmitted(dateStr, studentId) {
+            const record = appData.attendanceRecords[dateStr][studentId];
+            if(record) {
+                record.docSubmitted = false; saveData();
+                if (currentDateStr === dateStr) renderAttendanceTab();
+                showToast("서류 제출이 취소되었습니다.");
+            }
+        }
+
+        function refreshDocPopup() {
+            const widget = document.getElementById('docPopupWidget');
+            if (!appData.settings.enableDocPopup) { widget.classList.add('hidden'); return; }
+
+            const content = document.getElementById('docPopupContent');
+            content.innerHTML = '';
+            let missingCount = 0; let displayCount = 0;
+
+            const studentMap = {}; appData.students.forEach(s => studentMap[s.id] = s);
+            const dates = Object.keys(appData.attendanceRecords).sort((a, b) => new Date(b) - new Date(a));
+            
+            dates.forEach(date => {
+                const records = appData.attendanceRecords[date];
+                for (const studentId in records) {
+                    const rec = records[studentId];
+                    const student = studentMap[studentId];
+                    if (!student) continue;
+
+                    if (rec.doc && rec.doc !== '(없음)') {
+                        if (!rec.docSubmitted) missingCount++;
+                        
+                        if (!showCompletedDocs && !rec.docSubmitted) {
+                            displayCount++;
+                            const item = document.createElement('div');
+                            item.className = "p-3 flex justify-between items-center hover:bg-rose-50 transition";
+                            item.innerHTML = `
+                                <div>
+                                    <div class="text-xs text-slate-500 font-bold">${date}</div>
+                                    <div class="font-medium text-rose-900">${student.number}번 ${student.name}</div>
+                                    <div class="text-xs text-rose-700">${rec.doc} 필요</div>
+                                </div>
+                                <button onclick="forceDocSubmitted('${date}', '${studentId}')" class="bg-rose-100 hover:bg-rose-200 text-rose-700 border border-rose-200 px-3 py-1.5 rounded text-xs font-bold shadow-sm transition whitespace-nowrap">받음</button>
+                            `;
+                            content.appendChild(item);
+                        } else if (showCompletedDocs && rec.docSubmitted) {
+                            displayCount++;
+                            const item = document.createElement('div');
+                            item.className = "p-3 flex justify-between items-center hover:bg-emerald-50 transition opacity-75";
+                            item.innerHTML = `
+                                <div>
+                                    <div class="text-xs text-slate-500 font-bold">${date}</div>
+                                    <div class="font-medium text-emerald-900 line-through">${student.number}번 ${student.name}</div>
+                                    <div class="text-xs text-emerald-700">${rec.doc} 완료</div>
+                                </div>
+                                <button onclick="forceDocUnsubmitted('${date}', '${studentId}')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs font-bold shadow-sm transition whitespace-nowrap">취소</button>
+                            `;
+                            content.appendChild(item);
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('docPopupCount').textContent = missingCount;
+            if (displayCount === 0) {
+                content.innerHTML = `<div class="p-6 text-center text-slate-400 font-medium">${showCompletedDocs ? '완료된 서류가 없습니다.' : '밀린 서류가 없습니다! 🎉'}</div>`;
+            }
+            widget.classList.remove('hidden');
+        }
+
+        // --- 양식 자동 생성 인쇄 모달 ---
+        function openFormModal(studentId, dateStr) {
+            const student = appData.students.find(s => s.id === studentId);
+            const record = appData.attendanceRecords[dateStr][studentId];
+            if (!student || !record) return;
+
+            const html = generateFormHtml(record.reason, student, record, dateStr);
+            document.getElementById('formModalContent').innerHTML = html;
+            document.getElementById('formModal').classList.remove('hidden');
+        }
+
+        function closeFormModal() {
+            document.getElementById('formModal').classList.add('hidden');
+        }
+
+        function printFormModal() {
+            // 인쇄용 숨김 영역에 모달 내용 복사
+            const printArea = document.getElementById('printArea');
+            printArea.innerHTML = document.getElementById('formModalContent').innerHTML;
+            
+            // 모달 닫고 프린트 모드 클래스 추가
+            document.body.classList.add('printing-form');
+            window.print();
+            document.body.classList.remove('printing-form');
+        }
+
+        function generateFormHtml(type, student, record, dateStr) {
+            const classG = appData.classInfo.grade || ' ';
+            const classC = appData.classInfo.classNum || ' ';
+            const teacher = appData.classInfo.teacherName || ' ';
+            const stamp = appData.classInfo.stampImage ? `<img src="${appData.classInfo.stampImage}" class="absolute w-12 h-12 opacity-80" style="transform: translate(20px, -15px); mix-blend-mode: multiply;">` : '';
+            const dateObj = new Date(dateStr);
+            const dateFormatted = `${dateObj.getFullYear()} 년 ${dateObj.getMonth() + 1} 월 ${dateObj.getDate()} 일`;
+            
+            if (type === '질병') {
+                const isAbsent = record.status === 'ABSENT' ? 'border-[3px] border-black rounded-full px-1.5 py-0.5 inline-block' : '';
+                const isLate = record.status === 'LATE' ? 'border-[3px] border-black rounded-full px-1.5 py-0.5 inline-block' : '';
+                const isEarly = record.status === 'EARLY' ? 'border-[3px] border-black rounded-full px-1.5 py-0.5 inline-block' : '';
+                const isOther = record.status === 'OTHER' ? 'border-[3px] border-black rounded-full px-1.5 py-0.5 inline-block' : '';
+                
+                return `
+                    <div class="flex justify-end mb-8">
+                        <table class="border-collapse text-center text-sm border border-black">
+                            <tr><td rowspan="2" class="bg-gray-100 font-bold border border-black px-3 py-4">결<br>재</td><td class="bg-gray-100 border border-black w-24 py-1 font-bold">담 임</td><td class="bg-gray-100 border border-black w-24 py-1 font-bold">학년부장</td></tr>
+                            <tr><td class="border border-black h-20"></td><td class="border border-black h-20"></td></tr>
+                        </table>
+                    </div>
+                    <h1 class="text-3xl font-bold text-center mb-12 tracking-widest">(<span class="${isAbsent}">결석</span>·<span class="${isLate}">지각</span>·<span class="${isEarly}">조퇴</span>·<span class="${isOther}">결과</span>) 신고서</h1>
+                    <div class="text-lg leading-loose space-y-4 px-8 font-medium">
+                        <p>제 &nbsp;&nbsp;<b>${classG}</b>&nbsp;&nbsp; 학년 &nbsp;&nbsp;<b>${classC}</b>&nbsp;&nbsp; 반 &nbsp;&nbsp;<b>${student.number}</b>&nbsp;&nbsp; 번</p>
+                        <p>성 명 : &nbsp;<b>${student.name}</b></p>
+                        <p>구 분 : 출석인정( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ), 질병( &nbsp;&nbsp;<b>✔</b>&nbsp;&nbsp; )</p>
+                        <p class="mt-8 mb-4 tracking-wide">본인은 다음과 같이 (<span class="font-bold border-b-2 border-black pb-1">결석·지각·조퇴·결과</span>) 하였(겠)기에 보호자 연서로 신고합니다.</p>
+                        <table class="w-full border-collapse border border-black text-center mb-12">
+                            <tr>
+                                <th class="border border-black py-5 w-32 bg-gray-50">기 간</th>
+                                <td class="border border-black py-5">${dateObj.getFullYear()}년 ${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일부터 &nbsp; ${dateObj.getFullYear()}년 ${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일까지 ( 1 일)</td>
+                            </tr>
+                            <tr>
+                                <th class="border border-black py-10 bg-gray-50">사 유</th>
+                                <td class="border border-black py-10"></td>
+                            </tr>
+                        </table>
+                        <div class="text-center my-12">
+                            <p class="text-xl font-bold">${dateFormatted}</p>
+                        </div>
+                        <div class="flex flex-col items-end gap-6 mr-12 text-lg">
+                            <p>본 인 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
+                            <p>보호자 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
+                        </div>
+                        <h2 class="text-2xl font-bold text-center mt-16 mb-10 tracking-widest">학교장 귀하</h2>
+                        <hr class="border-black mb-10 border-t-2 border-dashed">
+                        <h3 class="text-2xl font-bold text-center mb-8 tracking-widest">담 임 확 인</h3>
+                        <table class="w-full border-collapse border border-black text-center text-sm font-medium">
+                            <tr><th class="border border-black py-3 w-32 bg-gray-50">확인일시</th><td class="border border-black py-3">${dateFormatted}</td></tr>
+                            <tr><th class="border border-black py-3 bg-gray-50">확인방법</th><td class="border border-black py-3">전화연락, 가정방문, 학부모내교, 본인상담, 기타: </td></tr>
+                            <tr><th class="border border-black py-3 bg-gray-50 h-16">확인내용</th><td class="border border-black py-3"></td></tr>
+                            <tr><th class="border border-black py-3 bg-gray-50">붙 임</th><td class="border border-black py-3 text-left pl-4">진단서, 진료확인서, 처방전, 담임의견서, 기타:</td></tr>
+                        </table>
+                        <p class="text-center mt-8 mb-8 text-lg font-bold">위와 같이 확인하였습니다.</p>
+                        <div class="flex justify-end items-center mr-16 text-lg relative font-bold">
+                            <p>학급담임 : &nbsp;&nbsp;&nbsp;${teacher}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
+                            ${stamp.replace('translate(20px, -15px)', 'translate(40px, -15px)')}
+                        </div>
+                    </div>
+                `;
+            }
+            else if (type === '인정-생리') {
+                return `
+                    <div class="py-12 px-8">
+                        <h1 class="font-bold text-center mb-16 tracking-wide">(결석/지각/조퇴/결과) <span class="text-4xl block mt-6 tracking-widest">보호자 확인서</span></h1>
+                        <table class="w-full border-collapse border border-black text-center text-lg mb-20 leading-relaxed">
+                            <tr>
+                                <th rowspan="2" class="border border-black py-6 w-40 bg-gray-50">대 상 자<br><br>인 적 사 항</th>
+                                <th class="border border-black py-6 w-32 bg-gray-50">학년 반</th>
+                                <td class="border border-black py-6 font-bold text-xl">${classG}학년 ${classC}반</td>
+                                <th class="border border-black py-6 w-32 bg-gray-50">성 명</th>
+                                <td class="border border-black py-6 font-bold text-xl">${student.name}</td>
+                            </tr>
+                            <tr>
+                                <th class="border border-black py-6 bg-gray-50">생년월일</th>
+                                <td class="border border-black py-6"></td>
+                                <th class="border border-black py-6 bg-gray-50">전화번호</th>
+                                <td class="border border-black py-6"></td>
+                            </tr>
+                            <tr>
+                                <th class="border border-black py-10 bg-gray-50">사 유</th>
+                                <td colspan="4" class="border border-black py-10 text-center font-bold text-2xl tracking-wide">생리통으로 인해 수업출석이 어려움</td>
+                            </tr>
+                            <tr>
+                                <th class="border border-black py-10 bg-gray-50">수업 출석 인정일</th>
+                                <td colspan="4" class="border border-black py-10 text-xl font-bold">${dateObj.getFullYear()} 년 &nbsp;&nbsp;&nbsp; ${dateObj.getMonth() + 1} 월 &nbsp;&nbsp;&nbsp; ${dateObj.getDate()} 일 ( 1 일간)</td>
+                            </tr>
+                            <tr>
+                                <th class="border border-black py-12 bg-gray-50 leading-relaxed">출석인정<br>근거</th>
+                                <td colspan="4" class="border border-black py-12 text-center text-xl font-medium tracking-wide">학교생활기록 작성 및 관리지침<br>(교육부훈령 제393호)</td>
+                            </tr>
+                        </table>
+                        <div class="text-center mb-32">
+                            <p class="text-2xl font-bold">${dateFormatted}</p>
+                        </div>
+                        <div class="flex justify-end gap-4 mr-20 text-2xl mb-32 font-bold">
+                            <p>보호자 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
+                        </div>
+                        <h2 class="text-4xl font-bold text-center tracking-widest">학교장 귀하</h2>
+                    </div>
+                `;
+            }
+            else if (type === '인정-체험학습') {
+                return `
+                    <div class="py-6 px-4">
+                        <div class="flex justify-end mb-10 relative">
+                            <table class="border-collapse text-center text-sm border border-black">
+                                <tr>
+                                    <td class="bg-gray-100 font-bold border border-black w-20 py-2">담 임</td>
+                                    <td class="bg-gray-100 font-bold border border-black w-20 py-2">부 장</td>
+                                    <td class="bg-gray-100 font-bold border border-black w-20 py-2">교 감</td>
+                                    <td class="bg-gray-100 font-bold border border-black w-20 py-2">교 장</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-black h-20 align-bottom pb-3 font-bold text-lg relative">
+                                        ${teacher}
+                                        ${stamp ? stamp.replace('-15px', '-5px').replace('20px', '15px') : ''}
+                                    </td>
+                                    <td class="border border-black h-20"></td>
+                                    <td class="border border-black h-20"></td>
+                                    <td class="border border-black h-20"></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <h1 class="text-3xl font-bold text-center mb-12 tracking-widest">「학교장허가 교외체험학습」 신청서</h1>
+                        <table class="w-full border-collapse border border-black text-center mb-10 font-medium">
+                            <tr>
+                                <th class="bg-gray-100 border border-black py-4 w-32 text-lg">성 명</th>
+                                <td colspan="3" class="border border-black py-4 text-lg tracking-wider">${classG}학년 ${classC}반 ${student.number}번 &nbsp;&nbsp; <b>${student.name}</b></td>
+                                <th class="bg-gray-100 border border-black py-4 w-32 text-lg">전화번호</th>
+                                <td colspan="2" class="border border-black py-4"></td>
+                            </tr>
+                            <tr>
+                                <th rowspan="2" class="bg-gray-100 border border-black text-lg">출석인정기간</th>
+                                <th rowspan="2" class="bg-gray-100 border border-black w-20 text-lg">신청<br>기간</th>
+                                <td class="bg-gray-100 border border-black py-3">1일 기준</td>
+                                <td colspan="3" class="border border-black py-3">20 &nbsp;&nbsp;&nbsp; 년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일 ~ 20 &nbsp;&nbsp;&nbsp; 년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일</td>
+                                <td rowspan="2" class="border border-black text-lg">총 ( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )일간</td>
+                            </tr>
+                            <tr>
+                                <td class="bg-gray-100 border border-black py-3">반일 기준</td>
+                                <td class="border border-black py-3">날짜</td>
+                                <td colspan="2" class="border border-black py-3">20 &nbsp;&nbsp;&nbsp; 년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-gray-100 border border-black py-4 text-lg">목 적</th>
+                                <td colspan="6" class="border border-black py-4 text-left px-4 h-20 align-top"></td>
+                            </tr>
+                            <tr>
+                                <th class="bg-gray-100 border border-black py-4 text-lg">세부 계획</th>
+                                <td colspan="6" class="border border-black py-4 text-left px-4 h-40 align-top"></td>
+                            </tr>
+                        </table>
+                        <div class="text-center mt-16">
+                            <p class="font-bold text-2xl mb-10 tracking-widest">위와 같이 신청합니다.</p>
+                            <p class="mb-12 text-xl font-bold">${dateFormatted}</p>
+                            <div class="flex flex-col items-end gap-6 mr-16 text-xl">
+                                <p>보호자 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
+                                <p>학 &nbsp; 생 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            return '';
+        }
+    </script>
+</body>
+</html>
