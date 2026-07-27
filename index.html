@@ -460,15 +460,20 @@
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     appData.classInfo.stampImage = event.target.result;
-                    saveData(); renderSettingsTab(); showToast("도장 저장됨.");
+                    saveData();
+                    document.getElementById('stampPreviewContainer').classList.remove('hidden');
+                    document.getElementById('stampPreviewImg').src = appData.classInfo.stampImage;
+                    showToast("도장 저장됨.");
                 };
                 reader.readAsDataURL(file);
             }
         }
 
         function removeStamp() {
-            appData.classInfo.stampImage = ''; document.getElementById('inpStamp').value = '';
-            saveData(); renderSettingsTab();
+            appData.classInfo.stampImage = ''; 
+            document.getElementById('inpStamp').value = '';
+            saveData(); 
+            document.getElementById('stampPreviewContainer').classList.add('hidden');
         }
 
         function renderSettingsTab() {
