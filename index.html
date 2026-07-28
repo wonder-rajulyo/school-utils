@@ -64,8 +64,8 @@
                     스마트 출결 관리
                 </div>
                 <div class="flex space-x-1 overflow-x-auto" id="nav-tabs">
-                    <button data-target="tab-settings" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors bg-indigo-700">설정</button>
-                    <button data-target="tab-attendance" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors">출결 입력</button>
+                    <button data-target="tab-settings" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors">설정</button>
+                    <button data-target="tab-attendance" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors bg-indigo-700">출결 입력</button>
                     <button data-target="tab-print" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors">보고서 출력</button>
                     <button data-target="tab-special" class="tab-btn whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-500 transition-colors">특결/공결 양식</button>
                 </div>
@@ -77,7 +77,7 @@
     <main class="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 relative">
         
         <!-- 1. 설정 탭 -->
-        <div id="tab-settings" class="tab-content active no-print">
+        <div id="tab-settings" class="tab-content no-print">
             <div class="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-slate-200">
                 <h2 class="text-xl font-bold text-slate-800 mb-4 border-b pb-2">학급 및 교사 기본 정보</h2>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -159,7 +159,7 @@
         </div>
 
         <!-- 2. 출결 입력 탭 -->
-        <div id="tab-attendance" class="tab-content no-print">
+        <div id="tab-attendance" class="tab-content active no-print">
             <div class="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-slate-200">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-4 border-b pb-4 mb-4">
                     <div class="flex items-center gap-3">
@@ -1006,7 +1006,7 @@
             const record = appData.attendanceRecords[dateStr][studentId];
             if (!student || !record) return;
 
-            const html = generateFormHtml(record.reason, student, record, dateStr);
+            const html = generateFormHtml(record.reason, student.id, record, dateStr);
             document.getElementById('formModalContent').innerHTML = html;
             document.getElementById('formModal').classList.remove('hidden');
         }
@@ -1026,13 +1026,22 @@
             document.body.classList.remove('printing-form');
         }
 
-        function generateFormHtml(type, student, record, dateStr) {
-            const classG = appData.classInfo.grade || ' ';
-            const classC = appData.classInfo.classNum || ' ';
-            const teacher = appData.classInfo.teacherName || ' ';
-            const stamp = appData.classInfo.stampImage ? `<img src="${appData.classInfo.stampImage}" class="absolute w-12 h-12 opacity-80" style="transform: translate(20px, -15px); mix-blend-mode: multiply;">` : '';
-            const dateObj = new Date(dateStr);
-            const dateFormatted = `${dateObj.getFullYear()} 년 ${dateObj.getMonth() + 1} 월 ${dateObj.getDate()} 일`;
+        function generateFormHtml(type, studentId, record, dateStr) {
+            const student = appData.students.find(s => s.id === studentId);
+            const classG = appData.classInfo.grade;
+            const classC = appData.classInfo.classNum;
+            const teacher = appData.classInfo.teacherName;
+            const stamp = appData.classInfo.stampImage ? `<img src="${appData.classInfo.stampImage}" class="absolute w-12 h-12 opacity-80" style="top: 50%; left: 50%; transform: translate(-50%, -50%); mix-blend-mode: multiply;">` : '';
+            
+            // 날짜 파싱
+            let y = '', m = '', d = '';
+            if(dateStr) {
+                const parts = dateStr.split('-');
+                if(parts.length === 3) {
+                    y = parts[0]; m = parts[1].replace(/^0/,''); d = parts[2].replace(/^0/,'');
+                }
+            }
+            const dateFormatted = `${y} 년 ${m} 월 ${d} 일`;
             
             if (type === '질병') {
                 const isAbsent = record.status === 'ABSENT' ? 'border-[3px] border-black rounded-full px-1.5 py-0.5 inline-block' : '';
@@ -1052,11 +1061,11 @@
                         <p>제 &nbsp;&nbsp;<b>${classG}</b>&nbsp;&nbsp; 학년 &nbsp;&nbsp;<b>${classC}</b>&nbsp;&nbsp; 반 &nbsp;&nbsp;<b>${student.number}</b>&nbsp;&nbsp; 번</p>
                         <p>성 명 : &nbsp;<b>${student.name}</b></p>
                         <p>구 분 : 출석인정( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ), 질병( &nbsp;&nbsp;<b>✔</b>&nbsp;&nbsp; )</p>
-                        <p class="mt-8 mb-4 tracking-wide">본인은 다음과 같이 (<span class="font-bold border-b-2 border-black pb-1">결석·지각·조퇴·결과</span>) 하였(겠)기에 보호자 연서로 신고합니다.</p>
+                        <p class="mt-8 mb-4 tracking-wide">본인은 다음과 같이 (<span class="font-bold border-b-2 border-black pb-1"><span class="${isAbsent}">결석</span>·<span class="${isLate}">지각</span>·<span class="${isEarly}">조퇴</span>·<span class="${isOther}">결과</span></span>) 하였(겠)기에 보호자 연서로 신고합니다.</p>
                         <table class="w-full border-collapse border border-black text-center mb-12">
                             <tr>
                                 <th class="border border-black py-5 w-32 bg-gray-50">기 간</th>
-                                <td class="border border-black py-5">${dateObj.getFullYear()}년 ${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일부터 &nbsp; ${dateObj.getFullYear()}년 ${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일까지 ( 1 일)</td>
+                                <td class="border border-black py-5">${y}년 ${m}월 ${d}일부터 &nbsp; ${y}년 ${m}월 ${d}일까지 ( 1 일)</td>
                             </tr>
                             <tr>
                                 <th class="border border-black py-10 bg-gray-50">사 유</th>
@@ -1070,19 +1079,36 @@
                             <p>본 인 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
                             <p>보호자 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
                         </div>
-                        <h2 class="text-2xl font-bold text-center mt-16 mb-10 tracking-widest">학교장 귀하</h2>
-                        <hr class="border-black mb-10 border-t-2 border-dashed">
-                        <h3 class="text-2xl font-bold text-center mb-8 tracking-widest">담 임 확 인</h3>
-                        <table class="w-full border-collapse border border-black text-center text-sm font-medium">
-                            <tr><th class="border border-black py-3 w-32 bg-gray-50">확인일시</th><td class="border border-black py-3">${dateFormatted}</td></tr>
-                            <tr><th class="border border-black py-3 bg-gray-50">확인방법</th><td class="border border-black py-3">전화연락, 가정방문, 학부모내교, 본인상담, 기타: </td></tr>
-                            <tr><th class="border border-black py-3 bg-gray-50 h-16">확인내용</th><td class="border border-black py-3"></td></tr>
-                            <tr><th class="border border-black py-3 bg-gray-50">붙 임</th><td class="border border-black py-3 text-left pl-4">진단서, 진료확인서, 처방전, 담임의견서, 기타:</td></tr>
-                        </table>
+                        <div class="border-t-2 border-black border-dashed my-12"></div>
+                        <div class="text-center">
+                            <h2 class="text-2xl font-bold tracking-widest mb-8">담 임 확 인</h2>
+                            <table class="w-full border-collapse border border-black text-center text-lg">
+                                <tr>
+                                    <th class="border border-black py-4 w-32 bg-gray-50">확인일시</th>
+                                    <td class="border border-black py-4">${y} 년 &nbsp;&nbsp;${m} 월 &nbsp;&nbsp;${d} 일</td>
+                                </tr>
+                                <tr>
+                                    <th class="border border-black py-4 bg-gray-50">확인방법</th>
+                                    <td class="border border-black py-4"><span class="border-[3px] border-black rounded-full px-2 py-0.5 inline-block">전화연락</span>, 가정방문, 학부모내교, 본인상담, 기타: </td>
+                                </tr>
+                                <tr>
+                                    <th class="border border-black py-4 bg-gray-50 h-24">확인내용</th>
+                                    <td class="border border-black py-4"></td>
+                                </tr>
+                                <tr>
+                                    <th class="border border-black py-4 bg-gray-50">붙 임</th>
+                                    <td class="border border-black py-4 text-left pl-4">
+                                        <span class="${record.doc === '진단서' ? 'border-[3px] border-black rounded-full px-2 py-0.5 inline-block' : ''}">진단서</span>, 
+                                        <span class="${record.doc === '진료확인서' ? 'border-[3px] border-black rounded-full px-2 py-0.5 inline-block' : ''}">진료확인서</span>, 
+                                        <span class="${record.doc === '처방전' ? 'border-[3px] border-black rounded-full px-2 py-0.5 inline-block' : ''}">처방전</span>, 
+                                        <span class="${record.doc === '담임의견서' ? 'border-[3px] border-black rounded-full px-2 py-0.5 inline-block' : ''}">담임의견서</span>, 기타:
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
                         <p class="text-center mt-8 mb-8 text-lg font-bold">위와 같이 확인하였습니다.</p>
-                        <div class="flex justify-end items-center mr-16 text-lg relative font-bold">
-                            <p>학급담임 : &nbsp;&nbsp;&nbsp;${teacher}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
-                            ${stamp.replace('translate(20px, -15px)', 'translate(40px, -15px)')}
+                        <div class="flex justify-end items-center mr-16 text-lg relative font-bold mt-4">
+                            <p>학급담임 : &nbsp;&nbsp;&nbsp;${teacher}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="relative inline-block">(인)${stamp}</span></p>
                         </div>
                     </div>
                 `;
@@ -1111,7 +1137,7 @@
                             </tr>
                             <tr>
                                 <th class="border border-black py-10 bg-gray-50">수업 출석 인정일</th>
-                                <td colspan="4" class="border border-black py-10 text-xl font-bold">${dateObj.getFullYear()} 년 &nbsp;&nbsp;&nbsp; ${dateObj.getMonth() + 1} 월 &nbsp;&nbsp;&nbsp; ${dateObj.getDate()} 일 ( 1 일간)</td>
+                                <td colspan="4" class="border border-black py-10 text-xl font-bold">${y} 년 &nbsp;&nbsp;&nbsp; ${m} 월 &nbsp;&nbsp;&nbsp; ${d} 일 ( 1 일간)</td>
                             </tr>
                             <tr>
                                 <th class="border border-black py-12 bg-gray-50 leading-relaxed">출석인정<br>근거</th>
