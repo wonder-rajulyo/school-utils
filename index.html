@@ -174,15 +174,70 @@
                     </div>
                 </div>
 
+                <!-- 출결 예외 입력 폼 -->
+                <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8">
+                    <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        결석·지각·조퇴·결과 학생 추가
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div class="lg:col-span-1">
+                            <label class="block text-sm font-bold text-slate-600 mb-1">대상 학생</label>
+                            <select id="frmStudent" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"></select>
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="block text-sm font-bold text-slate-600 mb-1">상태</label>
+                            <select id="frmStatus" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-red-700 font-bold">
+                                <option value="ABSENT">결석</option>
+                                <option value="LATE">지각</option>
+                                <option value="EARLY">조퇴</option>
+                                <option value="OTHER">결과</option>
+                            </select>
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="block text-sm font-bold text-slate-600 mb-1">출결 종류 (양식 기준)</label>
+                            <select id="frmReason" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                                <option value="질병">질병</option>
+                                <option value="인정-생리">인정-생리</option>
+                                <option value="인정-체험학습">인정-체험학습</option>
+                                <option value="미인정">미인정</option>
+                                <option value="기타">기타</option>
+                            </select>
+                        </div>
+                        <div class="lg:col-span-1">
+                            <label class="block text-sm font-bold text-slate-600 mb-1">제출할 증빙 서류</label>
+                            <select id="frmDoc" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                                <option value="(없음)">(없음)</option>
+                                <option value="진단서">진단서</option>
+                                <option value="진료확인서">진료확인서</option>
+                                <option value="처방전">처방전</option>
+                                <option value="학부모 확인서">학부모 확인서</option>
+                                <option value="담임의견서">담임의견서</option>
+                                <option value="기타">기타</option>
+                            </select>
+                        </div>
+                        <div class="lg:col-span-1 flex flex-col justify-end">
+                            <button onclick="addException()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition shadow h-[42px]">추가 및 저장</button>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-bold text-slate-600 mb-1">상세 사유 (결석신고서 등 양식에 자동 기입됨)</label>
+                        <input type="text" id="frmDetailedReason" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white" placeholder="예: 심한 감기몸살, 장염 등 구체적 사유">
+                    </div>
+                </div>
+
+                <!-- 오늘의 특이사항 목록 -->
+                <h3 class="font-bold text-slate-800 mb-3 text-lg border-b pb-2">오늘의 특이사항 목록</h3>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse min-w-[950px]">
                         <thead>
                             <tr class="bg-slate-100 text-slate-600 text-sm">
                                 <th class="py-3 px-4 rounded-tl-lg w-12 text-center">번호</th>
                                 <th class="py-3 px-4 w-20">이름</th>
-                                <th class="py-3 px-4 w-28 text-center">상태</th>
-                                <th class="py-3 px-4 w-48">사유 (선택/입력)</th>
-                                <th class="py-3 px-4 rounded-tr-lg">증빙 서류 및 제출확인</th>
+                                <th class="py-3 px-4 w-20 text-center">상태</th>
+                                <th class="py-3 px-4 w-48">출결 종류 / 상세 사유</th>
+                                <th class="py-3 px-4 w-40">증빙 서류</th>
+                                <th class="py-3 px-4 rounded-tr-lg w-32 text-center">관리</th>
                             </tr>
                         </thead>
                         <tbody id="attendanceListBody" class="divide-y divide-slate-100"></tbody>
@@ -378,7 +433,7 @@
             "OTHER": { label: "결과", color: "bg-blue-100 text-blue-800" }
         };
 
-        const DOC_OPTIONS = ["(없음)", "결석신고서", "생리결석확인서", "진단서/처방전", "체험학습결과보고서", "기타"];
+        const DOC_OPTIONS = ["(없음)", "진단서", "진료확인서", "처방전", "학부모 확인서", "담임의견서", "기타"];
 
         let currentDateStr = '';
 
@@ -615,7 +670,7 @@
         // --- 출결 탭 ---
         function getOrCreateRecord(dateStr, studentId) {
             if (!appData.attendanceRecords[dateStr]) appData.attendanceRecords[dateStr] = {};
-            if (!appData.attendanceRecords[dateStr][studentId]) appData.attendanceRecords[dateStr][studentId] = { status: 'PRESENT', reason: '', doc: '(없음)', docSubmitted: false };
+            if (!appData.attendanceRecords[dateStr][studentId]) appData.attendanceRecords[dateStr][studentId] = { status: 'PRESENT', reason: '', detailedReason: '', doc: '(없음)', docSubmitted: false };
             return appData.attendanceRecords[dateStr][studentId];
         }
 
@@ -623,8 +678,7 @@
             if (appData.students.length === 0) return showToast("학생 없음", false);
             if (!appData.attendanceRecords[currentDateStr]) appData.attendanceRecords[currentDateStr] = {};
             appData.students.forEach(s => { 
-                const rec = getOrCreateRecord(currentDateStr, s.id);
-                appData.attendanceRecords[currentDateStr][s.id] = { status: 'PRESENT', reason: '', doc: '(없음)', docSubmitted: false };
+                appData.attendanceRecords[currentDateStr][s.id] = { status: 'PRESENT', reason: '', detailedReason: '', doc: '(없음)', docSubmitted: false };
             });
             saveData(); renderAttendanceTab(); showToast("전원 출석 처리됨.");
         }
@@ -636,21 +690,57 @@
             if (field === 'status' || field === 'reason') renderAttendanceTab();
         }
 
-        function renderAttendanceTab() {
-            const tbody = document.getElementById('attendanceListBody');
-            tbody.innerHTML = '';
-            if (appData.students.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">학생을 추가해주세요.</td></tr>`; return;
+        function deleteException(studentId) {
+            if (confirm("이 학생의 특이사항을 삭제하고 출석으로 변경할까요?")) {
+                appData.attendanceRecords[currentDateStr][studentId] = { status: 'PRESENT', reason: '', detailedReason: '', doc: '(없음)', docSubmitted: false };
+                saveData(); renderAttendanceTab();
             }
+        }
 
+        function addException() {
+            const selectEl = document.getElementById('frmStudent');
+            const studentId = selectEl.value;
+            if (!studentId) return showToast("대상 학생을 선택하세요", false);
+            
+            const status = document.getElementById('frmStatus').value;
+            const reason = document.getElementById('frmReason').value;
+            const detailedReason = document.getElementById('frmDetailedReason').value;
+            const doc = document.getElementById('frmDoc').value;
+
+            const record = getOrCreateRecord(currentDateStr, studentId);
+            record.status = status;
+            record.reason = reason;
+            record.detailedReason = detailedReason;
+            record.doc = doc;
+            
+            saveData();
+            renderAttendanceTab();
+            document.getElementById('frmDetailedReason').value = '';
+            showToast("특이사항이 추가되었습니다.");
+        }
+
+        function renderAttendanceTab() {
+            // 학생 드롭다운 렌더링
+            const selectEl = document.getElementById('frmStudent');
+            selectEl.innerHTML = '<option value="" disabled selected>학생 선택</option>';
             appData.students.sort((a, b) => a.number - b.number).forEach(student => {
                 const record = getOrCreateRecord(currentDateStr, student.id);
-                const statusColor = STATUS_OPTIONS[record.status].color;
-
-                let optionsHtml = '';
-                for (const [key, val] of Object.entries(STATUS_OPTIONS)) {
-                    optionsHtml += `<option value="${key}" ${key === record.status ? 'selected' : ''} class="text-black bg-white">${val.label}</option>`;
+                if (record.status === 'PRESENT') {
+                    selectEl.innerHTML += `<option value="${student.id}">${student.number}번 ${student.name}</option>`;
                 }
+            });
+
+            // 예외 목록 렌더링
+            const tbody = document.getElementById('attendanceListBody');
+            tbody.innerHTML = '';
+            
+            let exceptionCount = 0;
+            appData.students.sort((a, b) => a.number - b.number).forEach(student => {
+                const record = getOrCreateRecord(currentDateStr, student.id);
+                if (record.status === 'PRESENT') return;
+                
+                exceptionCount++;
+                const statusColor = STATUS_OPTIONS[record.status].color;
 
                 let docOptionsHtml = '';
                 DOC_OPTIONS.forEach(doc => {
@@ -659,35 +749,43 @@
                 
                 // 동적 양식 버튼 로직
                 let generateBtnHtml = '';
-                if (record.status !== 'PRESENT' && (record.reason === '질병' || record.reason === '인정-생리' || record.reason === '인정-체험학습')) {
-                    generateBtnHtml = `<button onclick="openFormModal('${student.id}', '${currentDateStr}')" class="ml-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded text-xs font-bold border border-indigo-200 transition shadow-sm whitespace-nowrap">양식생성</button>`;
+                if (record.reason === '질병' || record.reason === '인정-생리' || record.reason === '인정-체험학습') {
+                    generateBtnHtml = `<button onclick="openFormModal('${student.id}', '${currentDateStr}')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded text-xs font-bold border border-indigo-200 transition shadow-sm whitespace-nowrap w-full mb-1">양식생성</button>`;
                 }
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="py-2 px-4 text-center font-medium">${student.number}</td>
-                    <td class="py-2 px-4 font-medium">${student.name}</td>
-                    <td class="py-2 px-4 text-center">
-                        <select onchange="updateAttendance('${student.id}', 'status', this.value)" class="${statusColor} w-full py-1.5 px-2 rounded-lg font-bold border-none outline-none appearance-none cursor-pointer text-center focus:ring-2 focus:ring-indigo-300">${optionsHtml}</select>
+                    <td class="py-3 px-4 text-center font-medium">${student.number}</td>
+                    <td class="py-3 px-4 font-bold text-slate-700">${student.name}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="${statusColor} px-2 py-1 rounded font-bold text-sm inline-block">${STATUS_OPTIONS[record.status].label}</span>
                     </td>
-                    <td class="py-2 px-4">
-                        <input type="text" list="reasonOptions" onchange="updateAttendance('${student.id}', 'reason', this.value)" value="${record.reason}" placeholder="질병/인정-생리/인정-체험학습/미인정" class="w-full px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-slate-50 focus:bg-white transition-colors">
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-slate-700 text-sm">${record.reason}</div>
+                        <div class="text-xs text-slate-500 mt-1 line-clamp-1">${record.detailedReason || '(상세 사유 없음)'}</div>
                     </td>
-                    <td class="py-2 px-4">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2 flex-grow max-w-[200px]">
-                                <select onchange="updateAttendance('${student.id}', 'doc', this.value)" class="w-full py-1.5 px-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-300 outline-none">${docOptionsHtml}</select>
-                                <label class="flex items-center gap-1 text-xs font-bold whitespace-nowrap cursor-pointer text-slate-600 bg-slate-50 px-2 py-1.5 rounded border border-slate-200 hover:bg-slate-100">
-                                    <input type="checkbox" onchange="updateAttendance('${student.id}', 'docSubmitted', this.checked)" ${record.docSubmitted ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded">
-                                    받음
-                                </label>
-                            </div>
+                    <td class="py-3 px-4">
+                        <div class="flex flex-col gap-1">
+                            <select onchange="updateAttendance('${student.id}', 'doc', this.value)" class="w-full py-1.5 px-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-300 outline-none">${docOptionsHtml}</select>
+                            <label class="flex items-center gap-1 text-xs font-bold cursor-pointer text-slate-600 w-max">
+                                <input type="checkbox" onchange="updateAttendance('${student.id}', 'docSubmitted', this.checked)" ${record.docSubmitted ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded">
+                                서류 받음 확인
+                            </label>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-center align-middle">
+                        <div class="flex flex-col">
                             ${generateBtnHtml}
+                            <button onclick="deleteException('${student.id}')" class="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded border border-red-200 text-xs font-bold transition shadow-sm w-full">삭제(출석)</button>
                         </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
+
+            if (exceptionCount === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-500 font-medium">오늘은 결석/지각/조퇴 학생이 없습니다. (전원 출석)</td></tr>`;
+            }
         }
 
         // --- 출력 탭 ---
@@ -927,7 +1025,7 @@
                             </tr>
                             <tr>
                                 <th class="border border-black py-10 bg-gray-50">사 유</th>
-                                <td class="border border-black py-10"></td>
+                                <td class="border border-black py-10 font-bold text-xl">${record.detailedReason || ''}</td>
                             </tr>
                         </table>
                         <div class="text-center my-12">
