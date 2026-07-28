@@ -45,6 +45,10 @@
         
         /* 팝업 최소화 효과 */
         .popup-minimized #docPopupContent { display: none; }
+        
+        /* 칩 버튼 기본 스타일 */
+        .chip-btn { padding: 0.375rem 1rem; border-radius: 9999px; border-width: 1px; font-size: 0.875rem; font-weight: 700; transition: all 0.2s; cursor: pointer; }
+        .chip-btn:not(.active):hover { background-color: #f8fafc; }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-10">
@@ -175,54 +179,65 @@
                 </div>
 
                 <!-- 출결 예외 입력 폼 -->
-                <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8">
-                    <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-8">
+                    <h3 class="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg">
+                        <svg class="w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                         결석·지각·조퇴·결과 학생 추가
                     </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <div class="lg:col-span-1">
-                            <label class="block text-sm font-bold text-slate-600 mb-1">대상 학생</label>
-                            <select id="frmStudent" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"></select>
+                    <div class="flex flex-col gap-5">
+                        <div class="w-full max-w-sm">
+                            <label class="block text-sm font-bold text-slate-600 mb-2">대상 학생</label>
+                            <select id="frmStudent" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium text-lg"></select>
                         </div>
-                        <div class="lg:col-span-1">
-                            <label class="block text-sm font-bold text-slate-600 mb-1">상태</label>
-                            <select id="frmStatus" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-red-700 font-bold">
-                                <option value="ABSENT">결석</option>
-                                <option value="LATE">지각</option>
-                                <option value="EARLY">조퇴</option>
-                                <option value="OTHER">결과</option>
-                            </select>
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-slate-600 mb-2">상태</label>
+                            <div class="flex flex-wrap gap-2" id="statusGroup">
+                                <button type="button" onclick="selectChip('statusGroup', 'frmStatus', 'ABSENT')" class="chip-btn active bg-red-100 border-red-500 text-red-800" data-val="ABSENT">결석</button>
+                                <button type="button" onclick="selectChip('statusGroup', 'frmStatus', 'LATE')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="LATE">지각</button>
+                                <button type="button" onclick="selectChip('statusGroup', 'frmStatus', 'EARLY')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="EARLY">조퇴</button>
+                                <button type="button" onclick="selectChip('statusGroup', 'frmStatus', 'OTHER')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="OTHER">결과</button>
+                            </div>
+                            <input type="hidden" id="frmStatus" value="ABSENT">
                         </div>
-                        <div class="lg:col-span-1">
-                            <label class="block text-sm font-bold text-slate-600 mb-1">출결 종류 (양식 기준)</label>
-                            <select id="frmReason" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                                <option value="질병">질병</option>
-                                <option value="인정-생리">인정-생리</option>
-                                <option value="인정-체험학습">인정-체험학습</option>
-                                <option value="미인정">미인정</option>
-                                <option value="기타">기타</option>
-                            </select>
+
+                        <div>
+                            <label class="block text-sm font-bold text-slate-600 mb-2">출결 종류 (양식 기준)</label>
+                            <div class="flex flex-wrap gap-2" id="reasonGroup">
+                                <button type="button" onclick="selectChip('reasonGroup', 'frmReason', '질병')" class="chip-btn active bg-indigo-100 border-indigo-500 text-indigo-800" data-val="질병">질병</button>
+                                <button type="button" onclick="selectChip('reasonGroup', 'frmReason', '인정-생리')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="인정-생리">인정-생리</button>
+                                <button type="button" onclick="selectChip('reasonGroup', 'frmReason', '인정-체험학습')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="인정-체험학습">인정-체험학습</button>
+                                <button type="button" onclick="selectChip('reasonGroup', 'frmReason', '미인정')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="미인정">미인정</button>
+                                <button type="button" onclick="selectChip('reasonGroup', 'frmReason', '기타')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="기타">기타</button>
+                            </div>
+                            <input type="hidden" id="frmReason" value="질병">
                         </div>
-                        <div class="lg:col-span-1">
-                            <label class="block text-sm font-bold text-slate-600 mb-1">제출할 증빙 서류</label>
-                            <select id="frmDoc" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                                <option value="(없음)">(없음)</option>
-                                <option value="진단서">진단서</option>
-                                <option value="진료확인서">진료확인서</option>
-                                <option value="처방전">처방전</option>
-                                <option value="학부모 확인서">학부모 확인서</option>
-                                <option value="담임의견서">담임의견서</option>
-                                <option value="기타">기타</option>
-                            </select>
+
+                        <div>
+                            <label class="block text-sm font-bold text-slate-600 mb-2">제출할 증빙 서류</label>
+                            <div class="flex flex-wrap gap-2" id="docGroup">
+                                <button type="button" onclick="selectChip('docGroup', 'frmDoc', '(없음)')" class="chip-btn active bg-indigo-100 border-indigo-500 text-indigo-800" data-val="(없음)">(없음)</button>
+                                <button type="button" onclick="selectChip('docGroup', 'frmDoc', '진단서')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="진단서">진단서</button>
+                                <button type="button" onclick="selectChip('docGroup', 'frmDoc', '진료확인서')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="진료확인서">진료확인서</button>
+                                <button type="button" onclick="selectChip('docGroup', 'frmDoc', '처방전')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="처방전">처방전</button>
+                                <button type="button" onclick="selectChip('docGroup', 'frmDoc', '학부모 확인서')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="학부모 확인서">학부모 확인서</button>
+                                <button type="button" onclick="selectChip('docGroup', 'frmDoc', '담임의견서')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="담임의견서">담임의견서</button>
+                                <button type="button" onclick="selectChip('docGroup', 'frmDoc', '기타')" class="chip-btn bg-white border-slate-300 text-slate-600" data-val="기타">기타</button>
+                            </div>
+                            <input type="hidden" id="frmDoc" value="(없음)">
                         </div>
-                        <div class="lg:col-span-1 flex flex-col justify-end">
-                            <button onclick="addException()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition shadow h-[42px]">추가 및 저장</button>
+
+                        <div>
+                            <label class="block text-sm font-bold text-slate-600 mb-2">상세 사유 (결석신고서 등 양식에 자동 기입됨)</label>
+                            <input type="text" id="frmDetailedReason" class="w-full px-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-base" placeholder="예: 심한 감기몸살, 장염 등 구체적 사유">
                         </div>
-                    </div>
-                    <div class="mt-4">
-                        <label class="block text-sm font-bold text-slate-600 mb-1">상세 사유 (결석신고서 등 양식에 자동 기입됨)</label>
-                        <input type="text" id="frmDetailedReason" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white" placeholder="예: 심한 감기몸살, 장염 등 구체적 사유">
+
+                        <div class="flex justify-end mt-2 pt-4 border-t border-slate-200">
+                            <button onclick="addException()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold transition shadow-md text-lg w-full sm:w-auto flex items-center justify-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                                특이사항 추가 및 저장
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -688,6 +703,26 @@
             record[field] = value;
             saveData();
             if (field === 'status' || field === 'reason') renderAttendanceTab();
+        }
+
+        function selectChip(groupId, inputId, value) {
+            document.getElementById(inputId).value = value;
+            const container = document.getElementById(groupId);
+            
+            // 색상 테마 결정
+            let activeClass = 'bg-indigo-100 border-indigo-500 text-indigo-800'.split(' ');
+            if (inputId === 'frmStatus' && value === 'ABSENT') activeClass = 'bg-red-100 border-red-500 text-red-800'.split(' ');
+            
+            container.querySelectorAll('.chip-btn').forEach(btn => {
+                const isSelected = btn.getAttribute('data-val') === value;
+                if (isSelected) {
+                    btn.classList.add('active', ...activeClass);
+                    btn.classList.remove('bg-white', 'border-slate-300', 'text-slate-600');
+                } else {
+                    btn.classList.remove('active', 'bg-indigo-100', 'border-indigo-500', 'text-indigo-800', 'bg-red-100', 'border-red-500', 'text-red-800');
+                    btn.classList.add('bg-white', 'border-slate-300', 'text-slate-600');
+                }
+            });
         }
 
         function deleteException(studentId) {
