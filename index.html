@@ -1115,42 +1115,61 @@
             }
             else if (type === '인정-생리') {
                 return `
-                    <div class="py-12 px-8">
-                        <h1 class="font-bold text-center mb-16 tracking-wide">(결석/지각/조퇴/결과) <span class="text-4xl block mt-6 tracking-widest">보호자 확인서</span></h1>
-                        <table class="w-full border-collapse border border-black text-center text-lg mb-20 leading-relaxed">
+                    <div class="py-6 px-4">
+                        <div class="flex justify-end mb-10 relative">
+                            <table class="border-collapse text-center text-sm border border-black">
+                                <tr>
+                                    <td rowspan="2" class="bg-gray-50 border border-black w-8 py-2">결<br>재</td>
+                                    <td class="bg-gray-50 border border-black w-24 py-1">계</td>
+                                    <td class="bg-gray-50 border border-black w-24 py-1">학년부장</td>
+                                </tr>
+                                <tr>
+                                    <td class="border border-black h-20"></td>
+                                    <td class="border border-black h-20"></td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <h1 class="text-3xl font-bold text-center mb-12 tracking-widest">(결석·지각·조퇴·결과) 신고서</h1>
+                        
+                        <div class="text-lg font-bold mb-8 leading-loose tracking-wide">
+                            <p>제 &nbsp;&nbsp;<b>${classG}</b>&nbsp;&nbsp; 학년 &nbsp;&nbsp;<b>${classC}</b>&nbsp;&nbsp; 반 &nbsp;&nbsp;<b>${student.number}</b>&nbsp;&nbsp; 번</p>
+                            <p>성 명 : &nbsp;<b>${student.name}</b></p>
+                            <p>구 분 : 출석인정( &nbsp;&nbsp;<b>O</b>&nbsp;&nbsp; ), 질병( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</p>
+                        </div>
+                        
+                        <p class="mt-8 mb-4 tracking-wide text-lg">본인은 다음과 같이 (<span class="font-bold border-b-2 border-black pb-1">결석·지각·조퇴·결과</span>) 하였(겠)기에 보호자 연서로 신고합니다.</p>
+                        
+                        <table class="w-full border-collapse border border-black text-center mb-12 text-lg">
                             <tr>
-                                <th rowspan="2" class="border border-black py-6 w-40 bg-gray-50">대 상 자<br><br>인 적 사 항</th>
-                                <th class="border border-black py-6 w-32 bg-gray-50">학년 반</th>
-                                <td class="border border-black py-6 font-bold text-xl">${classG}학년 ${classC}반</td>
-                                <th class="border border-black py-6 w-32 bg-gray-50">성 명</th>
-                                <td class="border border-black py-6 font-bold text-xl">${student.name}</td>
+                                <th class="border border-black py-6 w-32 bg-gray-50">기 간</th>
+                                <td class="border border-black py-6">${y} 년 &nbsp;&nbsp;${m} 월 &nbsp;&nbsp;${d} 일 ( 1 일)</td>
                             </tr>
                             <tr>
-                                <th class="border border-black py-6 bg-gray-50">생년월일</th>
-                                <td class="border border-black py-6"></td>
-                                <th class="border border-black py-6 bg-gray-50">전화번호</th>
-                                <td class="border border-black py-6"></td>
+                                <th class="border border-black py-16 bg-gray-50">보호자<br>의견</th>
+                                <td class="border border-black py-16 px-4 text-center leading-relaxed font-medium">
+                                    생리통으로 인하여 수업 출석이 어려움을 확인하며,<br>
+                                    보호자로서 위 학생 ( &nbsp;&nbsp;&nbsp;<b>${student.name}</b>&nbsp;&nbsp;&nbsp; )에 대한<br>
+                                    보호자 확인서를 제출하는 바입니다.
+                                </td>
                             </tr>
                             <tr>
-                                <th class="border border-black py-10 bg-gray-50">사 유</th>
-                                <td colspan="4" class="border border-black py-10 text-center font-bold text-2xl tracking-wide">생리통으로 인해 수업출석이 어려움</td>
-                            </tr>
-                            <tr>
-                                <th class="border border-black py-10 bg-gray-50">수업 출석 인정일</th>
-                                <td colspan="4" class="border border-black py-10 text-xl font-bold">${y} 년 &nbsp;&nbsp;&nbsp; ${m} 월 &nbsp;&nbsp;&nbsp; ${d} 일 ( 1 일간)</td>
-                            </tr>
-                            <tr>
-                                <th class="border border-black py-12 bg-gray-50 leading-relaxed">출석인정<br>근거</th>
-                                <td colspan="4" class="border border-black py-12 text-center text-xl font-medium tracking-wide">학교생활기록 작성 및 관리지침<br>(교육부훈령 제393호)</td>
+                                <th class="border border-black py-8 bg-gray-50">출석인정<br>근거</th>
+                                <td class="border border-black py-8">학교생활기록 작성 및 관리지침(교육부훈령 제393호)</td>
                             </tr>
                         </table>
-                        <div class="text-center mb-32">
-                            <p class="text-2xl font-bold">${dateFormatted}</p>
+                        
+                        <div class="text-center mb-16">
+                            <p class="text-xl font-bold">${y} 년 &nbsp;&nbsp;${m} 월 &nbsp;&nbsp;${d} 일</p>
                         </div>
-                        <div class="flex justify-end gap-4 mr-20 text-2xl mb-32 font-bold">
-                            <p>보호자 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
+                        
+                        <div class="flex justify-end mr-16 text-lg mb-16 font-bold flex-col items-end">
+                            <p class="mb-4">본 인 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
+                            <p class="mb-4">보호자 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</p>
+                            <p class="relative">학급담임 : &nbsp;&nbsp;&nbsp;${teacher}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="relative inline-block">(인)${stamp}</span></p>
                         </div>
-                        <h2 class="text-4xl font-bold text-center tracking-widest">학교장 귀하</h2>
+                        
+                        <h2 class="text-2xl font-bold text-center tracking-widest mt-16 mb-4">학교장 귀하</h2>
                     </div>
                 `;
             }
